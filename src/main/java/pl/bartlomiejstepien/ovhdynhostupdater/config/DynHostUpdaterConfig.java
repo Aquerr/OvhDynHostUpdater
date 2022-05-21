@@ -2,25 +2,27 @@ package pl.bartlomiejstepien.ovhdynhostupdater.config;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+import com.typesafe.config.ConfigObject;
 import com.typesafe.config.ConfigRenderOptions;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DynHostUpdaterConfig
 {
     private static final Logger LOGGER = LogManager.getLogger(DynHostUpdaterConfig.class);
-    private static final String CONFIG_PATH = "./config.conf";
+    private static final String CONFIG_PATH = System.getProperty("user.dir") + File.separator + "config.conf";
 
-    private final String username;
-    private final String password;
-    private final String hostName;
     private final Duration updateInterval;
+    private final List<DynHost> dynHosts;
 
     public static DynHostUpdaterConfig load()
     {
@@ -30,7 +32,8 @@ public class DynHostUpdaterConfig
 
     private static Config loadConfiguration()
     {
-        Path configFilePath = Paths.get(CONFIG_PATH);
+        Path configFilePath = Paths.get(CONFIG_PATH).toAbsolutePath().normalize();
+        LOGGER.info("Looking for config file in: {}", configFilePath.toString());
         if (Files.notExists(configFilePath))
         {
             try
@@ -58,25 +61,25 @@ public class DynHostUpdaterConfig
 
     private DynHostUpdaterConfig(Config config)
     {
-        this.username = config.getConfig("dynhost").getString("username");
-        this.password = config.getConfig("dynhost").getString("password");
-        this.hostName = config.getConfig("dynhost").getString("hostname");
+        List<DynHost> dynHosts = new ArrayList<>();
+
+        for (final ConfigObject configObject : config.getObjectList("dynhosts"))
+        {
+            Config dynHostConfig = configObject.toConfig();
+            DynHost dynHost = new DynHost(
+                    dynHostConfig.getString("username"),
+                    dynHostConfig.getString("password"),
+                    dynHostConfig.getString("hostname"));
+            dynHosts.add(dynHost);
+        }
+
+        this.dynHosts = dynHosts;
         this.updateInterval = config.getDuration("update-interval");
     }
 
-    public String getUsername()
+    public List<DynHost> getDynHosts()
     {
-        return username;
-    }
-
-    public String getPassword()
-    {
-        return password;
-    }
-
-    public String getHostName()
-    {
-        return hostName;
+        return dynHosts;
     }
 
     public Duration getUpdateInterval()

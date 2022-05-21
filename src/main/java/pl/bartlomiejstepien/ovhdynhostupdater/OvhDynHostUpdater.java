@@ -5,6 +5,7 @@ import org.apache.logging.log4j.Logger;
 import pl.bartlomiejstepien.ovhdynhostupdater.config.DynHostUpdaterConfig;
 import pl.bartlomiejstepien.ovhdynhostupdater.exception.CouldNotGetPublicIpException;
 import pl.bartlomiejstepien.ovhdynhostupdater.file.FileHandler;
+import pl.bartlomiejstepien.ovhdynhostupdater.ovh.client.DynHostUpdateResponse;
 import pl.bartlomiejstepien.ovhdynhostupdater.ovh.client.OvhDynHostClient;
 
 import java.io.IOException;
@@ -13,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -35,11 +37,7 @@ public class OvhDynHostUpdater
     {
         this.fileHandler = new FileHandler();
         this.dynHostUpdaterConfig = DynHostUpdaterConfig.load();
-
-        if (this.dynHostUpdaterConfig.getHostName().isBlank() || this.dynHostUpdaterConfig.getUsername().isBlank() || this.dynHostUpdaterConfig.getPassword().isBlank())
-            throw new IllegalArgumentException("Wrong configuration! Fill your configuration file with correct values!");
-
-        this.ovhDynHostClient = new OvhDynHostClient(this.dynHostUpdaterConfig);
+        this.ovhDynHostClient = new OvhDynHostClient();
     }
 
     void start()
@@ -68,7 +66,6 @@ public class OvhDynHostUpdater
         {
             LOGGER.info("IPs differ! Performing dynhost update!");
             performDynHostUpdate(publicIp);
-            LOGGER.info("Update completed!");
         }
         else
         {
@@ -81,8 +78,16 @@ public class OvhDynHostUpdater
     {
         try
         {
-            this.ovhDynHostClient.dynhostUpdate(publicIp);
-            this.fileHandler.setLastPublicIp(publicIp);
+            List<DynHostUpdateResponse> dynHostUpdateResponses = this.ovhDynHostClient.dynhostUpdate(this.dynHostUpdaterConfig.getDynHosts(), publicIp);
+            if (dynHostUpdateResponses.stream().allMatch(DynHostUpdateResponse::isOk))
+            {
+                this.fileHandler.setLastPublicIp(publicIp);
+                LOGGER.info("Update completed successfully!");
+            }
+            else
+            {
+                LOGGER.warn("Not all dynhosts could be updated. Update will be executed again for all dynhosts in {} seconds.", dynHostUpdaterConfig.getUpdateInterval().getSeconds());
+            }
         }
         catch (IOException | InterruptedException e)
         {

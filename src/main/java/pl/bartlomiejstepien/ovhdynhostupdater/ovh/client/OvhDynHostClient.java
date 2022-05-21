@@ -1,5 +1,8 @@
 package pl.bartlomiejstepien.ovhdynhostupdater.ovh.client;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import pl.bartlomiejstepien.ovhdynhostupdater.config.DynHost;
 import pl.bartlomiejstepien.ovhdynhostupdater.config.DynHostUpdaterConfig;
 
 import java.io.IOException;
@@ -9,35 +12,54 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 
 public class OvhDynHostClient
 {
-    private static final String DYN_HOST_UPDATE_URL = "https://www.ovh.com/nic/update?system=dyndns&hostname={hostname}&myip=${ip}";
+    private static final Logger LOGGER = LogManager.getLogger(OvhDynHostClient.class);
+    private static final String DYN_HOST_UPDATE_URL = "https://www.ovh.com/nic/update?system=dyndns&hostname={hostname}&myip={ip}";
 
-    private final DynHostUpdaterConfig dynHostUpdaterConfig;
     private final HttpClient httpClient;
 
-    public OvhDynHostClient(DynHostUpdaterConfig dynHostUpdaterConfig)
+    public OvhDynHostClient()
     {
-        this.dynHostUpdaterConfig = dynHostUpdaterConfig;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
     }
 
-    public void dynhostUpdate(String publicIp) throws IOException, InterruptedException
+    public List<DynHostUpdateResponse> dynhostUpdate(List<DynHost> dynHosts, String publicIp) throws IOException, InterruptedException
     {
-        String usernameAndPassword = dynHostUpdaterConfig.getUsername() + ":" + dynHostUpdaterConfig.getPassword();
-        String encodedUsernameAndPassword = Base64.getEncoder().encodeToString(usernameAndPassword.getBytes(StandardCharsets.UTF_8));
+        List<DynHostUpdateResponse> dynHostUpdateResponses = new ArrayList<>();
 
-        String preparedUrl = DYN_HOST_UPDATE_URL.replace("{hostname}", dynHostUpdaterConfig.getHostName()).replace("{ip}", publicIp);
+        for (final DynHost dynHost : dynHosts)
+        {
+            final String preparedUrl = getOvhUrl(dynHost.getHostName(), publicIp);
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .GET()
+                    .header("Authorization", "Basic " + prepareBase64Credentials(dynHost.getUsername(), dynHost.getPassword()))
+                    .uri(URI.create(preparedUrl))
+                    .build();
+            LOGGER.info("Sending request to: {},", preparedUrl);
+            HttpResponse<String> response = this.httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            LOGGER.info("Received response: status: {}, body: {}", response.statusCode(), response.body());
 
-        HttpRequest httpRequest = HttpRequest.newBuilder()
-                .GET()
-                .header("Authorization", "Basic " + encodedUsernameAndPassword)
-                .uri(URI.create(preparedUrl))
-                .build();
-        this.httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            dynHostUpdateResponses.add(new DynHostUpdateResponse(response.statusCode(), response.body()));
+        }
+
+        return dynHostUpdateResponses;
+    }
+
+    private String getOvhUrl(final String hostName, final String publicIp)
+    {
+        return DYN_HOST_UPDATE_URL.replace("{hostname}", hostName).replace("{ip}", publicIp);
+    }
+
+    private String prepareBase64Credentials(final String username, final String password)
+    {
+        String usernameAndPassword = username + ":" + password;
+        return Base64.getEncoder().encodeToString(usernameAndPassword.getBytes(StandardCharsets.UTF_8));
     }
 }
