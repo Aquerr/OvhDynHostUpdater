@@ -45,7 +45,7 @@ public class FileHandler
     {
         try
         {
-            Files.writeString(DYN_HOST_FILE.toPath(), publicIp, StandardCharsets.UTF_8, StandardOpenOption.WRITE);
+            Files.writeString(DYN_HOST_FILE.toPath(), publicIp, StandardCharsets.UTF_8);
         }
         catch (IOException e)
         {
