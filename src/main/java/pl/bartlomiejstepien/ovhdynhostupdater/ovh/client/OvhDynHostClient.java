@@ -3,7 +3,6 @@ package pl.bartlomiejstepien.ovhdynhostupdater.ovh.client;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import pl.bartlomiejstepien.ovhdynhostupdater.config.DynHost;
-import pl.bartlomiejstepien.ovhdynhostupdater.config.DynHostUpdaterConfig;
 
 import java.io.IOException;
 import java.net.URI;
@@ -36,17 +35,25 @@ public class OvhDynHostClient
 
         for (final DynHost dynHost : dynHosts)
         {
-            final String preparedUrl = getOvhUrl(dynHost.getHostName(), publicIp);
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .GET()
-                    .header("Authorization", "Basic " + prepareBase64Credentials(dynHost.getUsername(), dynHost.getPassword()))
-                    .uri(URI.create(preparedUrl))
-                    .build();
-            LOGGER.info("Sending request to: {},", preparedUrl);
-            HttpResponse<String> response = this.httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            LOGGER.info("Received response: status: {}, body: {}", response.statusCode(), response.body());
+            HttpResponse<String> response = null;
+            try
+            {
+                final String preparedUrl = getOvhUrl(dynHost.getHostName(), publicIp);
+                HttpRequest httpRequest = HttpRequest.newBuilder()
+                        .GET()
+                        .header("Authorization", "Basic " + prepareBase64Credentials(dynHost.getUsername(), dynHost.getPassword()))
+                        .uri(URI.create(preparedUrl))
+                        .build();
+                LOGGER.info("Sending request to: {},", preparedUrl);
+                response = this.httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+                LOGGER.info("Received response: status: {}, body: {}", response.statusCode(), response.body());
+                dynHostUpdateResponses.add(new DynHostUpdateResponse(response.statusCode(), response.body()));
+            }
+            catch (Exception exception)
+            {
+                dynHostUpdateResponses.add(new DynHostUpdateResponse(401, exception.getMessage()));
+            }
 
-            dynHostUpdateResponses.add(new DynHostUpdateResponse(response.statusCode(), response.body()));
         }
 
         return dynHostUpdateResponses;
