@@ -49,29 +49,26 @@ public class OvhDynHostUpdater
 
     void updateDynHost()
     {
-        String publicIp;
         try
         {
-            publicIp = getPublicIp();
-        }
-        catch (CouldNotGetPublicIpException e)
-        {
-            throw new IllegalStateException(e);
-        }
+            String publicIp = getPublicIp();
+            String lastPublicIp = this.fileHandler.getLastPublicIp();
 
-        String lastPublicIp = this.fileHandler.getLastPublicIp();
-
-        LOGGER.info("Comparing ips.... Last public IP: {}, New public IP: {}", lastPublicIp, publicIp);
-        if (!lastPublicIp.equals(publicIp))
-        {
-            LOGGER.info("IPs differ! Performing dynhost update!");
-            performDynHostUpdate(publicIp);
+            LOGGER.info("Comparing ips.... Last public IP: {}, New public IP: {}", lastPublicIp, publicIp);
+            if (!lastPublicIp.equals(publicIp))
+            {
+                LOGGER.info("IPs differ! Performing dynhost update!");
+                performDynHostUpdate(publicIp);
+            }
+            else
+            {
+                LOGGER.info("Skipping dynhost update. IPs are the same.");
+            }
         }
-        else
+        catch (Exception exception)
         {
-            LOGGER.info("Skipping dynhost update. IPs are the same.");
+            exception.printStackTrace();
         }
-
     }
 
     private void performDynHostUpdate(String publicIp)
