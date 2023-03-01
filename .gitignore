@@ -1,5 +1,6 @@
 /target
 /.idea
+*.log
 
 /config.conf
 /last_public_ip.txt
