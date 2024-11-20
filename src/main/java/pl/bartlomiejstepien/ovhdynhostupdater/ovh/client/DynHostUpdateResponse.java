@@ -13,6 +13,7 @@ public class DynHostUpdateResponse
 
     public boolean isOk()
     {
+        //TODO: Dodać akceptowalne statusy: 200, 404
         return this.statusCode == 200;
     }
 

@@ -15,6 +15,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -24,6 +25,7 @@ public class OvhDynHostUpdater
     private static final Logger LOGGER = LogManager.getLogger(OvhDynHostUpdater.class);
     private static final String IPIFY_API = "https://api.ipify.org";
     private static final ScheduledExecutorService EXECUTOR_SERVICE = Executors.newSingleThreadScheduledExecutor();
+    private static final Set<Integer> ALLOWED_STATUS_CODES = Set.of(200, 404);
     private final FileHandler fileHandler;
     private final DynHostUpdaterConfig dynHostUpdaterConfig;
     private final OvhDynHostClient ovhDynHostClient;
@@ -76,7 +78,7 @@ public class OvhDynHostUpdater
         try
         {
             List<DynHostUpdateResponse> dynHostUpdateResponses = this.ovhDynHostClient.dynhostUpdate(this.dynHostUpdaterConfig.getDynHosts(), publicIp);
-            if (dynHostUpdateResponses.stream().allMatch(DynHostUpdateResponse::isOk))
+            if (dynHostUpdateResponses.stream().allMatch(this::isResponseAllowed))
             {
                 this.fileHandler.setLastPublicIp(publicIp);
                 LOGGER.info("Update completed successfully!");
@@ -90,6 +92,11 @@ public class OvhDynHostUpdater
         {
             LOGGER.error(e);
         }
+    }
+
+    private boolean isResponseAllowed(DynHostUpdateResponse response)
+    {
+        return ALLOWED_STATUS_CODES.contains(response.getStatusCode());
     }
 
     private String getPublicIp() throws CouldNotGetPublicIpException
